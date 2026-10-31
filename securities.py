@@ -16,6 +16,7 @@ STOCKS: dict[str, str] = {
     "AMZN": "Amazon",
     "AVGO": "Broadcom",
     "BAC": "Bank of America",
+    "BF-B": "Brown Forman",
     "BRK-B": "Berkshire Hathaway",
     "CAT": "Caterpillar",
     "CMCSA": "Comcast",
