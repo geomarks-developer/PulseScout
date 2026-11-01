@@ -1,7 +1,7 @@
 """PulseScout - ETF module."""
 from __future__ import annotations
 
-FALLBACK_VERSION = "2026-10-31-v1"
+FALLBACK_VERSION = "2026-10-31-v2"
 
 import sys
 from pathlib import Path
@@ -18,6 +18,22 @@ from database import add_to_watchlist, load_watchlist
 from securities import format_security_option
 
 initialize_settings()
+# Local expense-ratio fallback. Values are stored as decimals (0.0008 = 0.08%).
+# Review periodically because fund fees can change.
+ETF_EXPENSE_RATIOS = {
+    "SPY": 0.0009, "IVV": 0.0003, "VOO": 0.0003, "VTI": 0.0003,
+    "DIA": 0.0016, "QQQ": 0.0018,
+    "VUG": 0.0004, "IWF": 0.0019, "SCHG": 0.0004, "QQQM": 0.0015,
+    "VTV": 0.0004, "IWD": 0.0019, "SCHV": 0.0004,
+    "SCHD": 0.0006, "VIG": 0.0005, "VYM": 0.0006, "DGRO": 0.0008,
+    "VXUS": 0.0005, "VEA": 0.0003, "VWO": 0.0007, "IXUS": 0.0007,
+    "BND": 0.0003, "AGG": 0.0003, "TLT": 0.0015, "IEF": 0.0015,
+    "VCSH": 0.0003,
+    "XLK": 0.0008, "XLF": 0.0008, "XLV": 0.0008, "XLI": 0.0008,
+    "XLE": 0.0008, "XLP": 0.0008, "XLY": 0.0008, "XLU": 0.0008,
+    "XLB": 0.0008, "XLRE": 0.0008, "XLC": 0.0008,
+}
+
 ETF_UNIVERSE = {
     "Broad Market": ("SPY", "IVV", "VOO", "VTI", "DIA", "QQQ"),
     "Growth": ("VUG", "IWF", "SCHG", "QQQM"),
@@ -223,6 +239,10 @@ def load_etf_data(tickers: tuple[str, ...]) -> pd.DataFrame:
                     if np.isfinite(candidate):
                         expense = candidate
                         break
+            # Final fallback: PulseScout's maintained local table.
+            if not np.isfinite(expense):
+                expense = ETF_EXPENSE_RATIOS.get(ticker, np.nan)
+
             if np.isfinite(expense) and expense > 0.20:
                 expense /= 100
 
