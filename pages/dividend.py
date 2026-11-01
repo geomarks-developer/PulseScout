@@ -61,6 +61,64 @@ def trailing_dividend_yield(security: yf.Ticker, price: float) -> float:
         print(f"Dividend yield fallback error for {security.ticker}: {type(exc).__name__}: {exc}")
         return np.nan
 
+def payout_ratio_fallback(
+    security: yf.Ticker,
+    history: pd.DataFrame,
+) -> float:
+    """Calculate payout ratio from trailing dividends and EPS."""
+    try:
+        if history is None or history.empty or "Dividends" not in history.columns:
+            return np.nan
+
+        dividends = pd.to_numeric(
+            history["Dividends"],
+            errors="coerce",
+        ).dropna()
+
+        if dividends.empty:
+            return np.nan
+
+        # Sum dividends paid during the most recent 365 days.
+        cutoff = dividends.index.max() - pd.Timedelta(days=365)
+        annual_dividend = float(
+            dividends[dividends.index > cutoff].sum()
+        )
+
+        if annual_dividend <= 0:
+            return np.nan
+
+        # Prefer annual EPS so dividend and earnings periods are comparable.
+        statement = security.income_stmt
+
+        if statement is None or statement.empty:
+            return np.nan
+
+        for row_name in ("Diluted EPS", "Basic EPS"):
+            if row_name not in statement.index:
+                continue
+
+            eps_values = pd.to_numeric(
+                statement.loc[row_name],
+                errors="coerce",
+            ).dropna()
+
+            if eps_values.empty:
+                continue
+
+            eps = number(eps_values.iloc[0])
+
+            if np.isfinite(eps) and eps > 0:
+                return float(annual_dividend / eps)
+
+        return np.nan
+
+    except Exception as exc:
+        print(
+            f"Dividend payout fallback error for "
+            f"{security.ticker}: "
+            f"{type(exc).__name__}: {exc}"
+        )
+        return np.nan
 
 def statement_growth_fallback(security: yf.Ticker) -> float:
     """Fallback when Yahoo info omits earningsGrowth."""
@@ -104,6 +162,11 @@ def dividend_scores(security: yf.Ticker, info: dict, history: pd.DataFrame, pric
     if not np.isfinite(dividend_yield):
         dividend_yield = trailing_dividend_yield(security, price)
     payout_ratio = number(info.get("payoutRatio"))
+    if not np.isfinite(payout_ratio):
+        payout_ratio = payout_ratio_fallback(
+            security,
+            history,
+        )
     five_year_yield = number(info.get("fiveYearAvgDividendYield"))
     roe = number(info.get("returnOnEquity"))
     margin = number(info.get("operatingMargins"))
