@@ -1,6 +1,8 @@
 """PulseScout - ETF module."""
 from __future__ import annotations
 
+FALLBACK_VERSION = "2026-10-31-v1"
+
 import sys
 from pathlib import Path
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
@@ -212,7 +214,15 @@ def load_etf_data(tickers: tuple[str, ...]) -> pd.DataFrame:
 
             expense = expense_ratio_from_funds_data(security)
             if not np.isfinite(expense):
-                expense = number(info.get("annualReportExpenseRatio"))
+                for key in (
+                    "annualReportExpenseRatio",
+                    "expenseRatio",
+                    "netExpenseRatio",
+                ):
+                    candidate = number(info.get(key))
+                    if np.isfinite(candidate):
+                        expense = candidate
+                        break
             if np.isfinite(expense) and expense > 0.20:
                 expense /= 100
 
