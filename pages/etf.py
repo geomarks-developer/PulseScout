@@ -362,16 +362,34 @@ for _, row in leaders.iterrows():
 
 if st.session_state.get("mobile_show_charts", True):
     st.divider()
-    st.markdown('<div class="section-label">RETURN VS RISK</div>', unsafe_allow_html=True)
-    chart = filtered.dropna(subset=["12M Return", "Volatility"]).copy()
+    st.markdown(
+        '<div class="section-label">RETURN VS RISK</div>',
+        unsafe_allow_html=True,
+    )
+
+    chart = filtered.copy()
+
+    # Force chart values to numeric
+    chart["12M Return"] = pd.to_numeric(
+        chart["12M Return"],
+        errors="coerce",
+    )
+    chart["Volatility"] = pd.to_numeric(
+        chart["Volatility"],
+        errors="coerce",
+    )
+
+    # Remove rows Plotly cannot chart
+    chart = chart.replace([np.inf, -np.inf], np.nan)
+    chart = chart.dropna(
+        subset=["12M Return", "Volatility"]
+    )
+
     if not chart.empty:
-        chart["Bubble Size"] = pd.to_numeric(chart["Net Assets"], errors="coerce").clip(lower=1)
         fig = px.scatter(
             chart,
             x="Volatility",
             y="12M Return",
-            size="Bubble Size",
-            size_max=25,
             color="Category",
             hover_name="Ticker",
             hover_data={
@@ -379,13 +397,43 @@ if st.session_state.get("mobile_show_charts", True):
                 "Overall Score": ":.1f",
                 "Expense Ratio": ":.2%",
                 "Dividend Yield": ":.2%",
-                "Bubble Size": False,
             },
         )
-        fig.update_xaxes(tickformat=".0%", title="Volatility")
-        fig.update_yaxes(tickformat=".0%", title="12M Return")
-        fig.update_layout(height=390, margin=dict(l=5,r=5,t=10,b=5), showlegend=False)
-        st.plotly_chart(fig, use_container_width=True)
+
+        # Use a fixed marker size instead of Net Assets
+        fig.update_traces(
+            marker=dict(size=14)
+        )
+
+        fig.update_xaxes(
+            tickformat=".0%",
+            title="Volatility",
+        )
+
+        fig.update_yaxes(
+            tickformat=".0%",
+            title="12M Return",
+        )
+
+        fig.update_layout(
+            height=390,
+            margin=dict(l=5, r=5, t=10, b=5),
+            showlegend=False,
+        )
+
+        st.plotly_chart(
+            fig,
+            use_container_width=True,
+        )
+
+    else:
+        st.info(
+            "Return and volatility data are unavailable "
+            "for the current selection."
+        )
 
 if st.session_state.get("mobile_show_disclaimer", True):
-    st.caption("Mobile ETF scores are compact research signals, not investment recommendations.")
+    st.caption(
+        "Mobile ETF scores are compact research signals, "
+        "not investment recommendations."
+    )
