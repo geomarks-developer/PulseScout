@@ -1,7 +1,7 @@
 """PulseScout - Value module."""
 from __future__ import annotations
 
-FALLBACK_VERSION = "2026-10-31-v1"
+FALLBACK_VERSION = "2026-10-31-v2"
 
 import sys
 from pathlib import Path
@@ -163,10 +163,82 @@ def value_scores(
         revenue_growth = fallback["Revenue Growth"]
     if not np.isfinite(earnings_growth):
         earnings_growth = fallback["Earnings Growth"]
+
     if not np.isfinite(fcf):
         fcf = fallback["Free Cash Flow"]
 
-    fcf_yield = fcf / market_cap if np.isfinite(fcf) and np.isfinite(market_cap) and market_cap > 0 else np.nan
+    # ---------------------------------------------------------
+    # Valuation fallbacks
+    # ---------------------------------------------------------
+
+    shares = fallback["Shares Outstanding"]
+
+    # Market Cap = Price × Shares Outstanding
+    if (
+        not np.isfinite(market_cap)
+        and np.isfinite(price)
+        and np.isfinite(shares)
+        and shares > 0
+    ):
+        market_cap = price * shares
+
+
+    # P/E fallback using annual EPS
+    eps = fallback["EPS"]
+
+    if (
+        not np.isfinite(forward_pe)
+        and np.isfinite(price)
+        and np.isfinite(eps)
+        and eps > 0
+    ):
+        forward_pe = price / eps
+
+
+    # Price / Book fallback
+    book_equity = fallback["Book Equity"]
+
+    if (
+        not np.isfinite(price_book)
+        and np.isfinite(market_cap)
+        and np.isfinite(book_equity)
+        and book_equity > 0
+    ):
+        price_book = market_cap / book_equity
+
+
+    # EV / EBITDA fallback
+    ebitda = fallback["EBITDA"]
+    total_debt = fallback["Total Debt"]
+    cash = fallback["Cash"]
+
+    if (
+        not np.isfinite(ev_ebitda)
+        and np.isfinite(market_cap)
+        and np.isfinite(ebitda)
+        and ebitda > 0
+    ):
+        enterprise_value = market_cap
+
+        if np.isfinite(total_debt):
+            enterprise_value += total_debt
+
+        if np.isfinite(cash):
+            enterprise_value -= cash
+
+        if enterprise_value > 0:
+            ev_ebitda = enterprise_value / ebitda
+
+
+    # Free Cash Flow Yield fallback
+    if (
+        np.isfinite(fcf)
+        and np.isfinite(market_cap)
+        and market_cap > 0
+    ):
+        fcf_yield = fcf / market_cap
+    else:
+        fcf_yield = np.nan
 
     closes = pd.Series(dtype=float)
     if history is not None and not history.empty and "Close" in history.columns:
