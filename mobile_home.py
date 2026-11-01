@@ -4,6 +4,8 @@ from __future__ import annotations
 import streamlit as st
 from app_utils import initialize_settings
 
+from securities import get_security_options, format_security_option
+
 initialize_settings()
 st.set_page_config(
     page_title="PulseScout",
@@ -77,17 +79,22 @@ st.markdown(
 
 st.markdown('<div class="ms-brand">📱 PulseScout</div>', unsafe_allow_html=True)
 st.markdown(
-    '<div class="ms-subtitle">Stocks, ETFs, value, growth, and income research in one mobile-first workspace.</div>',
+    '<div class="ms-subtitle">Stocks, ETFs, value, growth, and income research, from a bespoke list of quality tickers, in one mobile-first workspace.</div>',
     unsafe_allow_html=True,
 )
 
-search = st.text_input(
+selected_security = st.selectbox(
     "Search",
+    options=get_security_options(),
+    index=None,
     placeholder="Search a ticker, ETF, or company...",
+    format_func=format_security_option,
     label_visibility="collapsed",
 )
-if search:
-    st.session_state["mobile_search"] = search.strip().upper()
+
+if selected_security:
+    st.session_state["mobile_selected_ticker"] = selected_security
+    st.switch_page("pages/details.py")
 
 default_pages = {"Growth":"pages/growth.py","Value":"pages/value.py","Dividend":"pages/dividend.py","ETF":"pages/etf.py","Markets":"pages/markets.py"}
 default_module = st.session_state.get("mobile_default_module", "Growth")

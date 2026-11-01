@@ -13,6 +13,7 @@ import streamlit as st
 import yfinance as yf
 from app_utils import apply_card_density, cache_ttl, initialize_settings
 from database import add_to_watchlist, load_watchlist
+from securities import format_security_option
 
 initialize_settings()
 VALUE_TICKERS = (
@@ -220,21 +221,48 @@ if data.empty:
     st.warning("Value data is currently unavailable.")
     st.stop()
 
-search = st.text_input(
+# ---------------------------------------------------------
+# Search / filter
+# ---------------------------------------------------------
+search = st.selectbox(
     "Search Value",
-    value=st.session_state.get("mobile_search", ""),
-    placeholder="Ticker or company...",
+    options=list(VALUE_TICKERS),
+    index=None,
+    placeholder="Search a ticker or company...",
+    format_func=format_security_option,
+    key="value_search",
     label_visibility="collapsed",
-).strip()
-sector_options = ["All"] + sorted(data["Sector"].dropna().astype(str).unique().tolist())
-sector = st.selectbox("Sector", sector_options, label_visibility="collapsed")
+)
+
+sector_options = (
+    ["All"]
+    + sorted(
+        data["Sector"]
+        .dropna()
+        .astype(str)
+        .unique()
+        .tolist()
+    )
+)
+
+sector = st.selectbox(
+    "Sector",
+    sector_options,
+    label_visibility="collapsed",
+)
 
 filtered = data.copy()
+
 if search:
-    mask = filtered["Ticker"].astype(str).str.contains(search, case=False, regex=False) | filtered["Company"].astype(str).str.contains(search, case=False, regex=False)
-    filtered = filtered[mask]
+    filtered = filtered[
+        filtered["Ticker"].astype(str).str.upper() == search.upper()
+    ]
+
 if sector != "All":
-    filtered = filtered[filtered["Sector"] == sector]
+    filtered = filtered[
+        filtered["Sector"] == sector
+    ]
+
 
 st.markdown('<div class="section-label">VALUE SNAPSHOT</div>', unsafe_allow_html=True)
 a, b = st.columns(2)

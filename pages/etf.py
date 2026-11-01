@@ -13,6 +13,7 @@ import streamlit as st
 import yfinance as yf
 from app_utils import apply_card_density, cache_ttl, initialize_settings
 from database import add_to_watchlist, load_watchlist
+from securities import format_security_option
 
 initialize_settings()
 ETF_UNIVERSE = {
@@ -308,21 +309,38 @@ if data.empty:
     st.warning("ETF data is currently unavailable.")
     st.stop()
 
-search = st.text_input(
+# ---------------------------------------------------------
+# Search / filter
+# ---------------------------------------------------------
+search = st.selectbox(
     "Search ETF",
-    value=st.session_state.get("mobile_search", ""),
-    placeholder="ETF ticker or fund name...",
+    options=list(all_tickers()),
+    index=None,
+    placeholder="Search an ETF ticker or fund...",
+    format_func=format_security_option,
+    key="etf_search",
     label_visibility="collapsed",
-).strip()
+)
+
 category_options = ["All"] + list(ETF_UNIVERSE.keys())
-category = st.selectbox("Category", category_options, label_visibility="collapsed")
+
+category = st.selectbox(
+    "Category",
+    category_options,
+    label_visibility="collapsed",
+)
 
 filtered = data.copy()
+
 if search:
-    mask = filtered["Ticker"].astype(str).str.contains(search, case=False, regex=False) | filtered["Fund"].astype(str).str.contains(search, case=False, regex=False)
-    filtered = filtered[mask]
+    filtered = filtered[
+        filtered["Ticker"].astype(str).str.upper() == search.upper()
+    ]
+
 if category != "All":
-    filtered = filtered[filtered["Category"] == category]
+    filtered = filtered[
+        filtered["Category"] == category
+    ]
 
 st.markdown('<div class="section-label">ETF SNAPSHOT</div>', unsafe_allow_html=True)
 a, b = st.columns(2)

@@ -14,7 +14,7 @@ import streamlit as st
 import yfinance as yf
 from app_utils import apply_card_density, cache_ttl, initialize_settings
 from database import add_to_watchlist, load_watchlist
-
+from securities import format_security_option
 
 # Mobile Growth universe. Keep this deliberately broad but manageable.
 initialize_settings()
@@ -482,19 +482,15 @@ if data.empty:
 # ---------------------------------------------------------
 # Search / filter
 # ---------------------------------------------------------
-
-search_default = st.session_state.get(
-    "mobile_search",
-    "",
-)
-
-search = st.text_input(
+search = st.selectbox(
     "Search Growth",
-    value=search_default,
-    placeholder="Ticker or company...",
+    options=list(GROWTH_TICKERS),
+    index=None,
+    placeholder="Search a ticker or company...",
+    format_func=format_security_option,
+    key="growth_search",
     label_visibility="collapsed",
-).strip()
-
+)
 
 sector_options = (
     ["All"]
@@ -513,36 +509,17 @@ sector = st.selectbox(
     label_visibility="collapsed",
 )
 
-
 filtered = data.copy()
 
 if search:
-    mask = (
-        filtered["Ticker"]
-        .astype(str)
-        .str.contains(
-            search,
-            case=False,
-            regex=False,
-        )
-        |
-        filtered["Company"]
-        .astype(str)
-        .str.contains(
-            search,
-            case=False,
-            regex=False,
-        )
-    )
-
-    filtered = filtered[mask]
-
+    filtered = filtered[
+        filtered["Ticker"].astype(str).str.upper() == search.upper()
+    ]
 
 if sector != "All":
     filtered = filtered[
         filtered["Sector"] == sector
     ]
-
 
 # ---------------------------------------------------------
 # Growth Snapshot
