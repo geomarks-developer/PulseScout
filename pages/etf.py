@@ -79,9 +79,10 @@ def calculate_trailing_yield(
 
         return float(annual_dividends / price)
 
-    except Exception:
+    except Exception as exc:
+        print(f"ETF dividend fallback error for {security.ticker}: {type(exc).__name__}: {exc}")
         return np.nan
-    
+
 def linear(value: float, low: float, high: float) -> float:
     if not np.isfinite(value):
         return np.nan
@@ -210,6 +211,10 @@ def load_etf_data(tickers: tuple[str, ...]) -> pd.DataFrame:
                     price = float(closes.iloc[-1])
 
             expense = expense_ratio_from_funds_data(security)
+            if not np.isfinite(expense):
+                expense = number(info.get("annualReportExpenseRatio"))
+            if np.isfinite(expense) and expense > 0.20:
+                expense /= 100
 
             metrics = etf_metrics(
                 security,
@@ -227,7 +232,8 @@ def load_etf_data(tickers: tuple[str, ...]) -> pd.DataFrame:
                 "Net Assets": number(info.get("totalAssets")),
                 **metrics,
             })
-        except Exception:
+        except Exception as exc:
+            print(f"ETF data error for {ticker}: {type(exc).__name__}: {exc}")
             continue
 
     data = pd.DataFrame(rows)

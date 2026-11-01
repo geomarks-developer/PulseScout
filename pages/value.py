@@ -30,6 +30,59 @@ def number(value: object) -> float:
     return result if np.isfinite(result) else np.nan
 
 
+
+def statement_row(statement: pd.DataFrame, names: tuple[str, ...]) -> pd.Series:
+    for name in names:
+        if name in statement.index:
+            return pd.to_numeric(statement.loc[name], errors="coerce").dropna()
+    return pd.Series(dtype=float)
+
+
+def period_growth(values: pd.Series) -> float:
+    if len(values) < 2:
+        return np.nan
+    newest = number(values.iloc[0])
+    previous = number(values.iloc[1])
+    if not np.isfinite(newest) or not np.isfinite(previous) or previous <= 0:
+        return np.nan
+    return float(newest / previous - 1)
+
+
+def statement_value_fallbacks(security: yf.Ticker) -> dict[str, float]:
+    result = {"Revenue Growth": np.nan, "Earnings Growth": np.nan, "Free Cash Flow": np.nan}
+    for statement_name in ("quarterly_income_stmt", "income_stmt"):
+        try:
+            statement = getattr(security, statement_name)
+        except Exception as exc:
+            print(f"Value fallback error for {security.ticker} ({statement_name}): {type(exc).__name__}: {exc}")
+            continue
+        if statement is None or statement.empty:
+            continue
+        if not np.isfinite(result["Revenue Growth"]):
+            result["Revenue Growth"] = period_growth(statement_row(statement, ("Total Revenue", "Operating Revenue")))
+        if not np.isfinite(result["Earnings Growth"]):
+            result["Earnings Growth"] = period_growth(statement_row(statement, ("Net Income", "Net Income Common Stockholders", "Diluted EPS", "Basic EPS")))
+    for cash_name in ("quarterly_cashflow", "cashflow"):
+        try:
+            cashflow = getattr(security, cash_name)
+        except Exception as exc:
+            print(f"Value cash-flow fallback error for {security.ticker} ({cash_name}): {type(exc).__name__}: {exc}")
+            continue
+        if cashflow is None or cashflow.empty:
+            continue
+        values = statement_row(cashflow, ("Free Cash Flow",))
+        if not values.empty:
+            periods = min(4, len(values)) if cash_name.startswith("quarterly") else 1
+            result["Free Cash Flow"] = float(values.iloc[:periods].sum())
+            break
+        operating = statement_row(cashflow, ("Operating Cash Flow", "Total Cash From Operating Activities"))
+        capex = statement_row(cashflow, ("Capital Expenditure", "Capital Expenditures"))
+        if not operating.empty and not capex.empty:
+            periods = min(4, len(operating), len(capex)) if cash_name.startswith("quarterly") else 1
+            result["Free Cash Flow"] = float(operating.iloc[:periods].sum() + capex.iloc[:periods].sum())
+            break
+    return result
+
 def linear(value: float, low: float, high: float) -> float:
     if not np.isfinite(value):
         return np.nan
@@ -47,7 +100,11 @@ def mean_available(values: list[float]) -> float:
     return float(np.mean(usable)) if usable else np.nan
 
 
-def value_scores(info: dict, history: pd.DataFrame) -> dict[str, float]:
+def value_scores(
+    security: yf.Ticker,
+    info: dict,
+    history: pd.DataFrame,
+) -> dict[str, float]:
     market_cap = number(info.get("marketCap"))
     fcf = number(info.get("freeCashflow"))
     forward_pe = number(info.get("forwardPE"))
@@ -58,6 +115,14 @@ def value_scores(info: dict, history: pd.DataFrame) -> dict[str, float]:
     debt_equity = number(info.get("debtToEquity"))
     revenue_growth = number(info.get("revenueGrowth"))
     earnings_growth = number(info.get("earningsGrowth"))
+
+    fallback = statement_value_fallbacks(security)
+    if not np.isfinite(revenue_growth):
+        revenue_growth = fallback["Revenue Growth"]
+    if not np.isfinite(earnings_growth):
+        earnings_growth = fallback["Earnings Growth"]
+    if not np.isfinite(fcf):
+        fcf = fallback["Free Cash Flow"]
 
     fcf_yield = fcf / market_cap if np.isfinite(fcf) and np.isfinite(market_cap) and market_cap > 0 else np.nan
 
@@ -121,7 +186,7 @@ def load_value_data(tickers: tuple[str, ...]) -> pd.DataFrame:
             security = yf.Ticker(ticker)
             info = security.info or {}
             history = security.history(period="2y", auto_adjust=True)
-            scores = value_scores(info, history)
+            scores = value_scores(security, info, history)
             price = np.nan
             if history is not None and not history.empty and "Close" in history.columns:
                 closes = pd.to_numeric(history["Close"], errors="coerce").dropna()
@@ -136,7 +201,8 @@ def load_value_data(tickers: tuple[str, ...]) -> pd.DataFrame:
                 "Forward PE": number(info.get("forwardPE")),
                 **scores,
             })
-        except Exception:
+        except Exception as exc:
+            print(f"Value data error for {ticker}: {type(exc).__name__}: {exc}")
             continue
     data = pd.DataFrame(rows)
     if not data.empty:

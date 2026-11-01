@@ -43,6 +43,52 @@ def normalize_yield(value: object) -> float:
 
     return value
 
+
+def row_values(statement: pd.DataFrame, names: tuple[str, ...]) -> pd.Series:
+    for name in names:
+        if name in statement.index:
+            return pd.to_numeric(statement.loc[name], errors="coerce").dropna()
+    return pd.Series(dtype=float)
+
+
+def safe_period_growth(values: pd.Series) -> float:
+    if len(values) < 2:
+        return np.nan
+    newest = number(values.iloc[0])
+    previous = number(values.iloc[1])
+    if not np.isfinite(newest) or not np.isfinite(previous) or previous <= 0:
+        return np.nan
+    return float(newest / previous - 1)
+
+
+def statement_dividend_fallbacks(security: yf.Ticker) -> tuple[float, float]:
+    earnings_growth = np.nan
+    payout_ratio = np.nan
+    for statement_name in ("quarterly_income_stmt", "income_stmt"):
+        try:
+            statement = getattr(security, statement_name)
+        except Exception as exc:
+            print(f"Dividend fallback error for {security.ticker} ({statement_name}): {type(exc).__name__}: {exc}")
+            continue
+        if statement is None or statement.empty:
+            continue
+        earnings = row_values(statement, ("Net Income", "Net Income Common Stockholders", "Diluted EPS", "Basic EPS"))
+        if not np.isfinite(earnings_growth):
+            earnings_growth = safe_period_growth(earnings)
+        if not np.isfinite(payout_ratio):
+            eps = row_values(statement, ("Diluted EPS", "Basic EPS"))
+            try:
+                dividends = pd.to_numeric(security.dividends, errors="coerce").dropna()
+                if not eps.empty and len(dividends) > 0 and number(eps.iloc[0]) > 0:
+                    periods = 4 if statement_name.startswith("quarterly") else 1
+                    trailing = float(dividends.tail(periods).sum())
+                    payout_ratio = trailing / number(eps.iloc[0])
+            except Exception as exc:
+                print(f"Dividend payout fallback error for {security.ticker}: {type(exc).__name__}: {exc}")
+        if np.isfinite(earnings_growth) and np.isfinite(payout_ratio):
+            break
+    return earnings_growth, payout_ratio
+
 def linear(value: float, low: float, high: float) -> float:
     if not np.isfinite(value):
         return np.nan
@@ -60,7 +106,11 @@ def mean_available(values: list[float]) -> float:
     return float(np.mean(usable)) if usable else np.nan
 
 
-def dividend_scores(info: dict, history: pd.DataFrame) -> dict[str, float]:
+def dividend_scores(
+    security: yf.Ticker,
+    info: dict,
+    history: pd.DataFrame,
+) -> dict[str, float]:
     dividend_yield = normalize_yield(info.get("dividendYield"))
     payout_ratio = number(info.get("payoutRatio"))
     five_year_yield = number(info.get("fiveYearAvgDividendYield"))
@@ -121,7 +171,7 @@ def load_dividend_data(tickers: tuple[str, ...]) -> pd.DataFrame:
             security = yf.Ticker(ticker)
             info = security.info or {}
             history = security.history(period="2y", auto_adjust=True)
-            scores = dividend_scores(info, history)
+            scores = dividend_scores(security, info, history)
 
             price = np.nan
             if history is not None and not history.empty and "Close" in history.columns:
@@ -138,7 +188,8 @@ def load_dividend_data(tickers: tuple[str, ...]) -> pd.DataFrame:
                 "Forward PE": number(info.get("forwardPE")),
                 **scores,
             })
-        except Exception:
+        except Exception as exc:
+            print(f"Dividend data error for {ticker}: {type(exc).__name__}: {exc}")
             continue
 
     data = pd.DataFrame(rows)
