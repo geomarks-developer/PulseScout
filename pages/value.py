@@ -1,6 +1,8 @@
 """PulseScout - Value module."""
 from __future__ import annotations
 
+FALLBACK_VERSION = "2026-10-31-v1"
+
 import sys
 from pathlib import Path
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
@@ -49,7 +51,17 @@ def period_growth(values: pd.Series) -> float:
 
 
 def statement_value_fallbacks(security: yf.Ticker) -> dict[str, float]:
-    result = {"Revenue Growth": np.nan, "Earnings Growth": np.nan, "Free Cash Flow": np.nan}
+    result = {
+        "Revenue Growth": np.nan,
+        "Earnings Growth": np.nan,
+        "Free Cash Flow": np.nan,
+        "EPS": np.nan,
+        "Book Equity": np.nan,
+        "Shares Outstanding": np.nan,
+        "EBITDA": np.nan,
+        "Total Debt": np.nan,
+        "Cash": np.nan,
+    }
     for statement_name in ("quarterly_income_stmt", "income_stmt"):
         try:
             statement = getattr(security, statement_name)
@@ -62,6 +74,35 @@ def statement_value_fallbacks(security: yf.Ticker) -> dict[str, float]:
             result["Revenue Growth"] = period_growth(statement_row(statement, ("Total Revenue", "Operating Revenue")))
         if not np.isfinite(result["Earnings Growth"]):
             result["Earnings Growth"] = period_growth(statement_row(statement, ("Net Income", "Net Income Common Stockholders", "Diluted EPS", "Basic EPS")))
+        if statement_name == "income_stmt":
+            eps_values = statement_row(statement, ("Diluted EPS", "Basic EPS"))
+            if not eps_values.empty:
+                result["EPS"] = number(eps_values.iloc[0])
+            ebitda_values = statement_row(statement, ("Normalized EBITDA", "EBITDA"))
+            if not ebitda_values.empty:
+                result["EBITDA"] = number(ebitda_values.iloc[0])
+    for balance_name in ("quarterly_balance_sheet", "balance_sheet"):
+        try:
+            balance = getattr(security, balance_name)
+        except Exception as exc:
+            print(f"Value balance-sheet fallback error for {security.ticker} ({balance_name}): {type(exc).__name__}: {exc}")
+            continue
+        if balance is None or balance.empty:
+            continue
+        equity = statement_row(balance, ("Stockholders Equity", "Total Stockholder Equity", "Common Stock Equity"))
+        shares = statement_row(balance, ("Ordinary Shares Number", "Share Issued"))
+        debt = statement_row(balance, ("Total Debt",))
+        cash = statement_row(balance, ("Cash Cash Equivalents And Short Term Investments", "Cash And Cash Equivalents"))
+        if not equity.empty:
+            result["Book Equity"] = number(equity.iloc[0])
+        if not shares.empty:
+            result["Shares Outstanding"] = number(shares.iloc[0])
+        if not debt.empty:
+            result["Total Debt"] = number(debt.iloc[0])
+        if not cash.empty:
+            result["Cash"] = number(cash.iloc[0])
+        break
+
     for cash_name in ("quarterly_cashflow", "cashflow"):
         try:
             cashflow = getattr(security, cash_name)
@@ -104,6 +145,7 @@ def value_scores(
     security: yf.Ticker,
     info: dict,
     history: pd.DataFrame,
+    price: float,
 ) -> dict[str, float]:
     market_cap = number(info.get("marketCap"))
     fcf = number(info.get("freeCashflow"))
@@ -165,6 +207,10 @@ def value_scores(
     overall = sum(v*w for v, w in usable) / sum(w for _, w in usable) if usable else np.nan
 
     return {
+        "Market Cap": market_cap,
+        "Forward PE": forward_pe,
+        "Price to Book": price_book,
+        "EV/EBITDA": ev_ebitda,
         "FCF Yield": fcf_yield,
         "Revenue Growth": revenue_growth,
         "Earnings Growth": earnings_growth,
@@ -184,21 +230,26 @@ def load_value_data(tickers: tuple[str, ...]) -> pd.DataFrame:
     for ticker in tickers:
         try:
             security = yf.Ticker(ticker)
-            info = security.info or {}
+            try:
+                info = security.info or {}
+            except Exception as exc:
+                print(f"Value info unavailable for {ticker}: {type(exc).__name__}: {exc}")
+                info = {}
+
             history = security.history(period="2y", auto_adjust=True)
-            scores = value_scores(security, info, history)
             price = np.nan
             if history is not None and not history.empty and "Close" in history.columns:
                 closes = pd.to_numeric(history["Close"], errors="coerce").dropna()
                 if not closes.empty:
                     price = float(closes.iloc[-1])
+
+            scores = value_scores(security, info, history, price)
+
             rows.append({
                 "Ticker": ticker,
                 "Company": info.get("shortName") or ticker,
                 "Sector": info.get("sector") or "Unknown",
                 "Price": price,
-                "Market Cap": number(info.get("marketCap")),
-                "Forward PE": number(info.get("forwardPE")),
                 **scores,
             })
         except Exception as exc:
