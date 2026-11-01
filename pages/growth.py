@@ -67,6 +67,15 @@ def load_growth_data(tickers: tuple[str, ...]) -> pd.DataFrame:
 
             revenue_growth = _number(info.get("revenueGrowth"))
             earnings_growth = _number(info.get("earningsGrowth"))
+
+            # Yahoo's info endpoint can omit growth fields. Fall back to
+            # financial statements so Growth scores remain available.
+            if not np.isfinite(revenue_growth) or not np.isfinite(earnings_growth):
+                fallback_revenue, fallback_earnings = _statement_growth(security)
+                if not np.isfinite(revenue_growth):
+                    revenue_growth = fallback_revenue
+                if not np.isfinite(earnings_growth):
+                    earnings_growth = fallback_earnings
             roe = _number(info.get("returnOnEquity"))
             operating_margin = _number(info.get("operatingMargins"))
             forward_pe = _number(info.get("forwardPE"))
@@ -124,7 +133,8 @@ def load_growth_data(tickers: tuple[str, ...]) -> pd.DataFrame:
                 }
             )
 
-        except Exception:
+        except Exception as exc:
+            print(f"Growth data error for {ticker}: {type(exc).__name__}: {exc}")
             continue
 
     frame = pd.DataFrame(rows)
@@ -146,6 +156,71 @@ def _number(value: object) -> float:
         return np.nan
 
     return result if np.isfinite(result) else np.nan
+
+
+
+def _statement_growth(security: yf.Ticker) -> tuple[float, float]:
+    """Calculate missing revenue/earnings growth from Yahoo statements."""
+    revenue_growth = np.nan
+    earnings_growth = np.nan
+
+    for statement_name in ("quarterly_income_stmt", "income_stmt"):
+        try:
+            statement = getattr(security, statement_name)
+        except Exception as exc:
+            print(
+                f"Growth fallback error for {security.ticker} "
+                f"({statement_name}): {type(exc).__name__}: {exc}"
+            )
+            continue
+
+        if statement is None or statement.empty or statement.shape[1] < 2:
+            continue
+
+        if not np.isfinite(revenue_growth):
+            revenue_growth = _row_period_growth(
+                statement,
+                ("Total Revenue", "Operating Revenue"),
+            )
+
+        if not np.isfinite(earnings_growth):
+            earnings_growth = _row_period_growth(
+                statement,
+                (
+                    "Net Income",
+                    "Net Income Common Stockholders",
+                    "Diluted EPS",
+                    "Basic EPS",
+                ),
+            )
+
+        if np.isfinite(revenue_growth) and np.isfinite(earnings_growth):
+            break
+
+    return revenue_growth, earnings_growth
+
+
+def _row_period_growth(
+    statement: pd.DataFrame,
+    row_names: tuple[str, ...],
+) -> float:
+    """Calculate growth from the two most recent usable statement periods."""
+    for row_name in row_names:
+        if row_name not in statement.index:
+            continue
+
+        values = pd.to_numeric(statement.loc[row_name], errors="coerce").dropna()
+        if len(values) < 2:
+            continue
+
+        newest = _number(values.iloc[0])
+        previous = _number(values.iloc[1])
+        if not np.isfinite(newest) or not np.isfinite(previous) or previous <= 0:
+            continue
+
+        return float(newest / previous - 1)
+
+    return np.nan
 
 
 def _linear(value: float, low: float, high: float) -> float:
