@@ -1,7 +1,7 @@
 """PulseScout - Dividend module."""
 from __future__ import annotations
 
-FALLBACK_VERSION = "2026-10-31-v3"
+FALLBACK_VERSION = "2026-10-31-v4"
 
 import sys
 from pathlib import Path
@@ -162,9 +162,21 @@ def load_dividend_data(tickers: tuple[str, ...]) -> pd.DataFrame:
     for ticker in tickers:
         try:
             security = yf.Ticker(ticker)
-            info = security.info or {}
-            history = security.history(period="2y", auto_adjust=True)
-            scores = dividend_scores(info, history)
+
+            try:
+                info = security.info or {}
+            except Exception as exc:
+                print(
+                    f"Dividend info unavailable for {ticker}: "
+                    f"{type(exc).__name__}: {exc}"
+                )
+                info = {}
+
+            history = security.history(
+                period="2y",
+                auto_adjust=True,
+                actions=True,
+            )
 
             price = np.nan
             if history is not None and not history.empty and "Close" in history.columns:
