@@ -731,20 +731,20 @@ if not chart.empty:
     )
 
     fig.update_xaxes(
-        range=[0, 100]
+        range=[-5, 105]
     )
 
     fig.update_yaxes(
-        range=[0, 100]
+        range=[-5, 105]
     )
 
     fig.update_layout(
         height=390,
         margin=dict(
-            l=5,
-            r=5,
-            t=10,
-            b=5,
+            l=35,
+            r=35,
+            t=35,
+            b=35,
         ),
         showlegend=False,
     )

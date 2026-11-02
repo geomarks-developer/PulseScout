@@ -497,9 +497,9 @@ if st.session_state.get("mobile_show_charts", True):
         )
         fig.add_vline(x=65, line_dash="dot", line_color="gray")
         fig.add_hline(y=50, line_dash="dot", line_color="gray")
-        fig.update_xaxes(range=[0, 100], title="Valuation →")
-        fig.update_yaxes(range=[100, 0], title="Trap Risk ↓")
-        fig.update_layout(height=390, margin=dict(l=5, r=5, t=10, b=5), showlegend=False)
+        fig.update_xaxes(range=[-5, 105], title="Valuation →")
+        fig.update_yaxes(range=[105, -5], title="Trap Risk ↓")
+        fig.update_layout(height=390, margin=dict(l=35, r=35, t=35, b=35), showlegend=False)
         st.plotly_chart(fig, use_container_width=True)
 
 if st.session_state.get("mobile_show_disclaimer", True):

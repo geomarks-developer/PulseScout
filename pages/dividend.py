@@ -412,10 +412,32 @@ if st.session_state.get("mobile_show_charts", True):
                 "Bubble Size": False,
             },
         )
-        fig.update_xaxes(tickformat=".1%", title="Dividend Yield")
-        fig.update_yaxes(range=[0, 100], title="Sustainability")
-        fig.update_layout(height=390, margin=dict(l=5, r=5, t=10, b=5), showlegend=False)
-        st.plotly_chart(fig, use_container_width=True)
+        fig.update_xaxes(
+            tickformat=".1%",
+            title="Dividend Yield"
+        )
+
+        fig.update_yaxes(
+            range=[-5, 105],
+            title="Sustainability"
+        )
+
+        fig.update_layout(
+            height=410,
+            margin=dict(
+                l=35,
+                r=35,
+                t=50,
+                b=35,
+            ),
+            showlegend=False,
+        )
+
+        st.plotly_chart(
+            fig,
+            width="content",
+            height="content",
+        )
 
 if st.session_state.get("mobile_show_disclaimer", True):
     st.caption("Mobile Dividend scores are compact research signals, not investment recommendations.")
