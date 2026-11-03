@@ -186,17 +186,60 @@ if st.session_state.get("mobile_show_charts", True):
     period = st.segmented_control("Range", ["1M", "3M", "6M", "1Y", "2Y", "5Y"], default="1Y", label_visibility="collapsed")
     period_days = {"1M": 31, "3M": 93, "6M": 186, "1Y": 366, "2Y": 732, "5Y": 1830}
     chart_data = history.copy()
+    # Calculate moving averages using the full history
+    chart_data["SMA50"] = chart_data["Close"].rolling(window=50).mean()
+    chart_data["SMA200"] = chart_data["Close"].rolling(window=200).mean()
+
     if not chart_data.empty:
         cutoff = pd.Timestamp.now(tz=chart_data.index.tz) - pd.Timedelta(days=period_days.get(period, 366))
         chart_data = chart_data.loc[chart_data.index >= cutoff]
         fig = go.Figure()
-        fig.add_trace(go.Scatter(x=chart_data.index, y=chart_data["Close"], mode="lines", name=symbol))
+
+        # Price
+        fig.add_trace(
+            go.Scatter(
+                x=chart_data.index,
+                y=chart_data["Close"],
+                mode="lines",
+                name=symbol,
+                line=dict(width=2),
+            )
+        )
+
+        # 50-day moving average
+        fig.add_trace(
+            go.Scatter(
+                x=chart_data.index,
+                y=chart_data["SMA50"],
+                mode="lines",
+                name="50 Day MA",
+                line=dict(color="#f5a623", width=1.5),
+            )
+        )
+
+        # 200-day moving average
+        fig.add_trace(
+            go.Scatter(
+                x=chart_data.index,
+                y=chart_data["SMA200"],
+                mode="lines",
+                name="200 Day MA",
+                line=dict(color="#9b59b6", width=1.5),
+            )
+        )
         fig.update_layout(
             height=315,
-            margin=dict(l=5, r=5, t=10, b=5),
+            margin=dict(l=5, r=5, t=35, b=5),
             xaxis_title="",
             yaxis_title="Price",
-            showlegend=False,
+            showlegend=True,
+            legend=dict(
+                orientation="h",
+                yanchor="bottom",
+                y=1.02,
+                xanchor="left",
+                x=0,
+            ),
             hovermode="x unified",
         )
         fig.update_yaxes(tickprefix="$", tickformat=",.2f")
