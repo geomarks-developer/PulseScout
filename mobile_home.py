@@ -1,12 +1,19 @@
 """PulseScout home screen."""
+
 from __future__ import annotations
 
 import streamlit as st
-from app_utils import initialize_settings
 
+from app_utils import initialize_settings
 from securities import get_security_options, format_security_option
 
+
+# ---------------------------------------------------------
+# INITIALIZATION
+# ---------------------------------------------------------
+
 initialize_settings()
+
 st.set_page_config(
     page_title="PulseScout",
     page_icon="📱",
@@ -14,74 +21,196 @@ st.set_page_config(
     initial_sidebar_state="collapsed",
 )
 
-# Hide the sidebar expand arrow/control
+
+# ---------------------------------------------------------
+# PAGE STYLING
+# ---------------------------------------------------------
+
 st.markdown(
     """
     <style>
+
+    /* -----------------------------------------------------
+       Hide sidebar
+       ----------------------------------------------------- */
+
+    [data-testid="stSidebar"] {
+        display: none;
+    }
+
     [data-testid="collapsedControl"] {
         display: none !important;
     }
+
+
+    /* -----------------------------------------------------
+       Main page container
+       ----------------------------------------------------- */
+
+    .block-container {
+        max-width: 520px;
+        padding-top: 2.75rem;
+        padding-left: 1rem;
+        padding-right: 1rem;
+        padding-bottom: 5rem;
+    }
+
+
+    /* -----------------------------------------------------
+       PulseScout branding
+       ----------------------------------------------------- */
+
+    .ms-brand {
+        font-size: 2rem;
+        font-weight: 800;
+        line-height: 1.1;
+        margin-bottom: .2rem;
+    }
+
+    .ms-subtitle {
+        color: #9aa3b2;
+        font-size: .95rem;
+        line-height: 1.4;
+        margin-bottom: 1.25rem;
+    }
+
+
+    /* -----------------------------------------------------
+       Section labels
+       ----------------------------------------------------- */
+
+    .quick-label {
+        font-size: .9rem;
+        font-weight: 600;
+        color: #9aa3b2;
+        margin-top: 1rem;
+        margin-bottom: .35rem;
+        letter-spacing: .04rem;
+    }
+
+
+    /* -----------------------------------------------------
+       Main research cards
+       ----------------------------------------------------- */
+
+    div[data-testid="stButton"] {
+        margin-bottom: .25rem;
+    }
+
+    div[data-testid="stButton"] > button {
+        width: 100%;
+        min-height: 96px;
+
+        border: 1px solid rgba(128, 128, 128, .25);
+        background: rgba(128, 128, 128, .055);
+
+        border-radius: 18px;
+
+        padding: 1rem 1.1rem;
+
+        text-align: left;
+        justify-content: flex-start;
+
+        transition:
+            background-color 0.15s ease,
+            border-color 0.15s ease,
+            transform 0.10s ease;
+    }
+
+
+    /* -----------------------------------------------------
+       Card hover
+       ----------------------------------------------------- */
+
+    div[data-testid="stButton"] > button:hover {
+        border-color: #4f8cff;
+        background: rgba(79, 140, 255, .08);
+        transform: translateY(-1px);
+    }
+
+
+    /* -----------------------------------------------------
+       Card pressed
+       ----------------------------------------------------- */
+
+    div[data-testid="stButton"] > button:active {
+        transform: scale(.99);
+    }
+
+
+    /* -----------------------------------------------------
+       Align icon and content
+       ----------------------------------------------------- */
+
+    div[data-testid="stButton"] > button > div {
+        width: 100%;
+        justify-content: flex-start;
+        text-align: left;
+        align-items: center;
+        gap: .8rem;
+    }
+
+
+    /* -----------------------------------------------------
+       Material icon sizing
+       ----------------------------------------------------- */
+
+    div[data-testid="stButton"] span[data-testid="stIconMaterial"] {
+        flex-shrink: 0;
+        font-size: 1.45rem;
+    }
+
+
+    /* -----------------------------------------------------
+       Card text
+       ----------------------------------------------------- */
+
+    div[data-testid="stButton"] > button p {
+        text-align: left;
+        line-height: 1.4;
+        white-space: pre-wrap;
+        margin: 0;
+    }
+
+
+    /* -----------------------------------------------------
+       Quick-access page links
+       ----------------------------------------------------- */
+
+    div[data-testid="stPageLink"] a {
+        border-radius: 12px;
+    }
+
     </style>
     """,
     unsafe_allow_html=True,
 )
 
+
+# ---------------------------------------------------------
+# HEADER
+# ---------------------------------------------------------
+
 st.markdown(
-    """
-<style>
-[data-testid="stSidebar"] {display: none;}
-[data-testid="collapsedControl"] {display: none;}
-.block-container {
-    max-width: 520px;
-    padding-top: 2.75rem;
-    padding-left: 1rem;
-    padding-right: 1rem;
-    padding-bottom: 5rem;
-}
-.ms-brand {
-    font-size: 2rem;
-    font-weight: 800;
-    line-height: 1.1;
-    margin-bottom: .2rem;
-}
-.ms-subtitle {
-    color: #9aa3b2;
-    font-size: .95rem;
-    margin-bottom: 1.25rem;
-}
-.ms-card {
-    border: 1px solid rgba(128,128,128,.25);
-    background: rgba(128,128,128,.055);
-    border-radius: 18px;
-    padding: 1rem 1rem .8rem 1rem;
-    margin-bottom: .65rem;
-}
-.ms-card-title {
-    font-size: 1.18rem;
-    font-weight: 750;
-    margin-bottom: .2rem;
-}
-.ms-card-text {
-    color: #9aa3b2;
-    font-size: .88rem;
-    line-height: 1.4;
-}
-.quick-label {
-    font-size: .9rem;
-    color: #9aa3b2;
-    margin-top: .8rem;
-    margin-bottom: .25rem;
-}
-</style>
-""",
+    '<div class="ms-brand">📱 PulseScout</div>',
     unsafe_allow_html=True,
 )
 
-st.markdown('<div class="ms-brand">📱 PulseScout</div>', unsafe_allow_html=True)
 st.markdown(
-    '<div class="ms-subtitle">Stocks, ETFs, value, growth, and income research, from a bespoke list of quality tickers, in one mobile-first workspace.</div>',
+    """
+    <div class="ms-subtitle">
+        Stocks, ETFs, value, growth, and income research,
+        from a bespoke list of quality tickers,
+        in one mobile-first workspace.
+    </div>
+    """,
     unsafe_allow_html=True,
 )
+
+
+# ---------------------------------------------------------
+# SECURITY SEARCH
+# ---------------------------------------------------------
 
 selected_security = st.selectbox(
     "Search",
@@ -96,35 +225,123 @@ if selected_security:
     st.session_state["mobile_selected_ticker"] = selected_security
     st.switch_page("pages/details.py")
 
-default_pages = {"Growth":"pages/growth.py","Value":"pages/value.py","Dividend":"pages/dividend.py","ETF":"pages/etf.py","Markets":"pages/markets.py"}
-default_module = st.session_state.get("mobile_default_module", "Growth")
-st.page_link(default_pages.get(default_module, "pages/growth.py"), label=f"Open default: {default_module}", icon="🚀", width="stretch")
-st.markdown('<div class="quick-label">RESEARCH</div>', unsafe_allow_html=True)
+
+# ---------------------------------------------------------
+# RESEARCH
+# ---------------------------------------------------------
+
+st.markdown(
+    '<div class="quick-label">RESEARCH</div>',
+    unsafe_allow_html=True,
+)
+
+
+# ---------------------------------------------------------
+# RESEARCH CARDS
+# ---------------------------------------------------------
 
 cards = [
-    ("📈", "Growth", "Find businesses with strong expansion, quality, and momentum.", "pages/growth.py"),
-    ("💎", "Value", "Find attractive valuations while watching quality and value-trap risk.", "pages/value.py"),
-    ("💰", "Dividend", "Research income, dividend quality, sustainability, and safety.", "pages/dividend.py"),
-    ("🌐", "ETF", "Explore ETFs, sectors, performance, expenses, and allocation ideas.", "pages/etf.py"),
+    (
+        ":material/trending_up:",
+        "Growth",
+        "Find businesses with strong expansion, quality, and momentum.",
+        "pages/growth.py",
+    ),
+    (
+        ":material/diamond:",
+        "Value",
+        "Find attractive valuations while watching quality and value-trap risk.",
+        "pages/value.py",
+    ),
+    (
+        ":material/payments:",
+        "Dividend",
+        "Research income, dividend quality, sustainability, and safety.",
+        "pages/dividend.py",
+    ),
+    (
+        ":material/public:",
+        "ETF",
+        "Explore ETFs, sectors, performance, expenses, and allocation ideas.",
+        "pages/etf.py",
+    ),
 ]
 
-for icon, title, description, page in cards:
-    st.markdown(
-        f'<div class="ms-card"><div class="ms-card-title">{icon} {title}</div>'
-        f'<div class="ms-card-text">{description}</div></div>',
-        unsafe_allow_html=True,
-    )
-    st.page_link(page, label=f"Open {title}", icon=icon, width="stretch")
 
-st.markdown('<div class="quick-label">QUICK ACCESS</div>', unsafe_allow_html=True)
+# ---------------------------------------------------------
+# CLICKABLE RESEARCH CARDS
+# ---------------------------------------------------------
+
+for icon, title, description, page in cards:
+
+    card_label = f"**{title}**\n\n{description}"
+
+    if st.button(
+        card_label,
+        key=f"home_card_{title.lower()}",
+        icon=icon,
+        width="stretch",
+    ):
+        st.switch_page(page)
+
+
+# ---------------------------------------------------------
+# QUICK ACCESS
+# ---------------------------------------------------------
+
+st.markdown(
+    '<div class="quick-label">QUICK ACCESS</div>',
+    unsafe_allow_html=True,
+)
+
 q1, q2 = st.columns(2)
+
 with q1:
-    st.page_link("pages/watchlist.py", label="Watchlist", icon="⭐", width="stretch")
-    st.page_link("pages/compare.py", label="Compare", icon="⚖️", width="stretch")
+    st.page_link(
+        "pages/watchlist.py",
+        label="Watchlist",
+        icon="⭐",
+        width="stretch",
+    )
+
+    st.page_link(
+        "pages/compare.py",
+        label="Compare",
+        icon="⚖️",
+        width="stretch",
+    )
+
+
 with q2:
-    st.page_link("pages/markets.py", label="Markets", icon="🌐", width="stretch")
-    st.page_link("pages/settings.py", label="Settings", icon="⚙️", width="stretch")
-st.page_link("pages/score_guide.py", label="Score Guide", icon="📖", width="stretch")
+    st.page_link(
+        "pages/markets.py",
+        label="Markets",
+        icon="🌐",
+        width="stretch",
+    )
+
+    st.page_link(
+        "pages/settings.py",
+        label="Settings",
+        icon="⚙️",
+        width="stretch",
+    )
+
+
+st.page_link(
+    "pages/score_guide.py",
+    label="Score Guide",
+    icon="📖",
+    width="stretch",
+)
+
+
+# ---------------------------------------------------------
+# FOOTER
+# ---------------------------------------------------------
 
 st.divider()
-st.caption("PulseScout • Research tools for informational and educational use")
+
+st.caption(
+    "PulseScout • Research tools for informational and educational use"
+)
