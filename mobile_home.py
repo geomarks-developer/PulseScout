@@ -242,30 +242,31 @@ st.markdown(
 
 cards = [
     (
-        ":material/trending_up:",
+        "📈",
         "Growth",
         "Find businesses with strong expansion, quality, and momentum.",
         "pages/growth.py",
     ),
     (
-        ":material/diamond:",
+        "💎",
         "Value",
         "Find attractive valuations while watching quality and value-trap risk.",
         "pages/value.py",
     ),
     (
-        ":material/payments:",
+        "💵",
         "Dividend",
         "Research income, dividend quality, sustainability, and safety.",
         "pages/dividend.py",
     ),
     (
-        ":material/public:",
+        "🌐",
         "ETF",
         "Explore ETFs, sectors, performance, expenses, and allocation ideas.",
         "pages/etf.py",
     ),
 ]
+
 
 
 # ---------------------------------------------------------
@@ -289,52 +290,15 @@ for icon, title, description, page in cards:
 # QUICK ACCESS
 # ---------------------------------------------------------
 
-st.markdown(
-    '<div class="quick-label">QUICK ACCESS</div>',
-    unsafe_allow_html=True,
-)
-
+st.markdown('<div class="quick-label">QUICK ACCESS</div>', unsafe_allow_html=True)
 q1, q2 = st.columns(2)
-
 with q1:
-    st.page_link(
-        "pages/watchlist.py",
-        label="Watchlist",
-        icon="⭐",
-        width="stretch",
-    )
-
-    st.page_link(
-        "pages/compare.py",
-        label="Compare",
-        icon="⚖️",
-        width="stretch",
-    )
-
-
+    st.page_link("pages/watchlist.py", label="Watchlist", icon="⭐", width="stretch")
+    st.page_link("pages/compare.py", label="Compare", icon="⚖️", width="stretch")
 with q2:
-    st.page_link(
-        "pages/markets.py",
-        label="Markets",
-        icon="🌐",
-        width="stretch",
-    )
-
-    st.page_link(
-        "pages/settings.py",
-        label="Settings",
-        icon="⚙️",
-        width="stretch",
-    )
-
-
-st.page_link(
-    "pages/score_guide.py",
-    label="Score Guide",
-    icon="📖",
-    width="stretch",
-)
-
+    st.page_link("pages/markets.py", label="Markets", icon="🌐", width="stretch")
+    st.page_link("pages/settings.py", label="Settings", icon="⚙️", width="stretch")
+st.page_link("pages/score_guide.py", label="Score Guide", icon="📖", width="stretch")
 
 # ---------------------------------------------------------
 # FOOTER
