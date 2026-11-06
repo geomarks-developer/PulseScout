@@ -239,6 +239,8 @@ if st.session_state.get("mobile_show_charts", True):
                 y=1.02,
                 xanchor="left",
                 x=0,
+                itemclick="toggleothers",
+                itemdoubleclick="toggle",
             ),
             hovermode="x unified",
         )

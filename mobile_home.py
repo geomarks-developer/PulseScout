@@ -307,5 +307,5 @@ st.page_link("pages/score_guide.py", label="Score Guide", icon="📖", width="st
 st.divider()
 
 st.caption(
-    "PulseScout • Research tools for informational and educational use"
+    "This research tool for informational and educational use"
 )

@@ -23,6 +23,7 @@ from database import (
     remove_from_watchlist,
 )
 
+
 initialize_settings()
 DEFAULT_SYMBOLS = ("MSFT", "GOOG", "AAPL", "NVDA", "SCHD", "SPY")
 
@@ -43,6 +44,104 @@ def normalize_yield(value: object) -> float:
         value /= 100
     return value
 
+def linear(value: float, low: float, high: float) -> float:
+    if not np.isfinite(value):
+        return np.nan
+
+    if high == low:
+        return 50.0
+
+    return float(
+        np.clip(
+            (value - low) / (high - low) * 100,
+            0,
+            100,
+        )
+    )
+
+
+def inverse(value: float, low: float, high: float) -> float:
+    if not np.isfinite(value):
+        return np.nan
+
+    return float(
+        np.clip(
+            (high - value) / (high - low) * 100,
+            0,
+            100,
+        )
+    )
+
+
+def mean_available(values: list[float]) -> float:
+    usable = [
+        value
+        for value in values
+        if np.isfinite(value)
+    ]
+
+    return float(np.mean(usable)) if usable else np.nan
+
+
+def watchlist_score(
+    forward_pe: float,
+    dividend_yield: float,
+    ret_6m: float,
+    ret_12m: float,
+    volatility: float,
+) -> float:
+    """
+    Compact PulseScout Watchlist score.
+
+    Uses only metrics already collected by the Watchlist so
+    displaying the score does not require another Yahoo request.
+    """
+
+    valuation = inverse(
+        forward_pe,
+        10,
+        40,
+    )
+
+    momentum = mean_available(
+        [
+            linear(ret_6m, -0.20, 0.35),
+            linear(ret_12m, -0.30, 0.50),
+        ]
+    )
+
+    risk = inverse(
+        volatility,
+        0.10,
+        0.45,
+    )
+
+    income = linear(
+        dividend_yield,
+        0.00,
+        0.05,
+    )
+
+    components = [
+        (valuation, 0.30),
+        (momentum, 0.40),
+        (risk, 0.20),
+        (income, 0.10),
+    ]
+
+    usable = [
+        (value, weight)
+        for value, weight in components
+        if np.isfinite(value)
+    ]
+
+    if not usable:
+        return np.nan
+
+    return (
+        sum(value * weight for value, weight in usable)
+        / sum(weight for _, weight in usable)
+    )
 
 def fmt(value: object, pattern: str) -> str:
     value = number(value)
@@ -67,13 +166,31 @@ def load_watchlist_data(symbols: tuple[str, ...]) -> tuple[pd.DataFrame, pd.Data
             ret_12m = closes.iloc[-1] / closes.iloc[-252] - 1 if len(closes) > 251 else np.nan
             volatility = float(closes.pct_change().dropna().std() * np.sqrt(252)) if len(closes) > 20 else np.nan
             quote_type = str(info.get("quoteType") or "Unknown")
+
+            dividend_yield = normalize_yield(
+                info.get("dividendYield")
+            )
+
+            forward_pe = number(
+                info.get("forwardPE")
+            )
+
+            score = watchlist_score(
+                forward_pe=forward_pe,
+                dividend_yield=dividend_yield,
+                ret_6m=ret_6m,
+                ret_12m=ret_12m,
+                volatility=volatility,
+            )
+
             rows.append({
                 "Symbol": symbol,
                 "Name": info.get("shortName") or symbol,
                 "Type": quote_type,
                 "Price": price,
-                "Dividend Yield": normalize_yield(info.get("dividendYield")),
-                "Forward PE": number(info.get("forwardPE")),
+                "Score": score,
+                "Dividend Yield": dividend_yield,
+                "Forward PE": forward_pe,
                 "1M Return": ret_1m,
                 "6M Return": ret_6m,
                 "12M Return": ret_12m,
@@ -106,21 +223,34 @@ def remove_symbol(symbol: str) -> None:
 
 def watch_card(row: pd.Series) -> None:
     symbol = str(row["Symbol"])
-    st.markdown(f"""
+    score = number(row.get("Score"))
+
+    st.markdown(
+        f"""
 <div class="watch-card">
  <div class="watch-row">
-  <div><div class="symbol">{symbol}</div><div class="name">{row.get('Name', symbol)}</div></div>
-  <div class="price">{fmt(row.get('Price'), '${:,.2f}')}</div>
+  <div>
+   <div class="symbol">{symbol}</div>
+   <div class="name">{row.get('Name', symbol)}</div>
+  </div>
+  <div class="score">{fmt(score, '{:.0f}')}</div>
  </div>
+
  <div class="mini-row">
+  <span>Price <b>{fmt(row.get('Price'), '${:,.2f}')}</b></span>
   <span>1M <b>{fmt(row.get('1M Return'), '{:.1%}')}</b></span>
   <span>6M <b>{fmt(row.get('6M Return'), '{:.1%}')}</b></span>
   <span>12M <b>{fmt(row.get('12M Return'), '{:.1%}')}</b></span>
   <span>Yield <b>{fmt(row.get('Dividend Yield'), '{:.2%}')}</b></span>
+  <span>P/E <b>{fmt(row.get('Forward PE'), '{:.1f}')}</b></span>
  </div>
 </div>
-""", unsafe_allow_html=True)
+""",
+        unsafe_allow_html=True,
+    )
+
     left, right = st.columns(2)
+
     with left:
         if st.button(
             "🔎 Details",
@@ -130,8 +260,13 @@ def watch_card(row: pd.Series) -> None:
             st.session_state["mobile_selected_ticker"] = symbol
             st.session_state["mobile_search"] = symbol
             st.switch_page("pages/details.py")
+
     with right:
-        if st.button("🗑️ Remove", key=f"watch_remove_{symbol}", use_container_width=True):
+        if st.button(
+            "🗑️ Remove",
+            key=f"watch_remove_{symbol}",
+            use_container_width=True,
+        ):
             remove_symbol(symbol)
             load_watchlist_data.clear()
             st.rerun()
@@ -150,7 +285,16 @@ st.markdown("""
 .watch-row {display:flex;align-items:flex-start;justify-content:space-between;gap:.8rem;}
 .symbol {font-size:1.25rem;font-weight:800;}
 .name {font-size:.82rem;color:#9aa3b2;margin-top:.12rem;}
-.price {font-size:1.05rem;font-weight:800;}
+.score {
+    min-width:46px;
+    text-align:center;
+    border-radius:12px;
+    padding:.35rem .45rem;
+    background:#1877f2;
+    color:white;
+    font-weight:800;
+    font-size:1.05rem;
+}
 .mini-row {display:grid;grid-template-columns:1fr 1fr;gap:.35rem .8rem;margin-top:.8rem;font-size:.82rem;color:#9aa3b2;}
 .section-label {font-size:.82rem;color:#9aa3b2;font-weight:650;margin-top:.7rem;}
 </style>
@@ -224,9 +368,13 @@ c.metric("Median 12M", fmt(data["12M Return"].median(), "{:.1%}"))
 d.metric("Median Yield", fmt(data["Dividend Yield"].median(), "{:.2%}"))
 
 st.markdown('<div class="section-label">YOUR SYMBOLS</div>', unsafe_allow_html=True)
-order = {symbol: index for index, symbol in enumerate(watchlist)}
-data["_order"] = data["Symbol"].map(order)
-data = data.sort_values("_order")
+
+data = data.sort_values(
+    by="Score",
+    ascending=False,
+    na_position="last",
+).reset_index(drop=True)
+
 for _, row in data.iterrows():
     watch_card(row)
 
@@ -240,7 +388,7 @@ if not performance.empty:
         margin=dict(l=5, r=5, t=10, b=5),
         xaxis_title="",
         yaxis_title="Growth of $100",
-        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="center", x=.5),
+        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="center", x=.5,itemclick="toggleothers",itemdoubleclick="toggle",),
         hovermode="x unified",
     )
     st.plotly_chart(fig, use_container_width=True)

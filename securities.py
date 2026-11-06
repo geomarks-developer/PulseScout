@@ -34,7 +34,7 @@ STOCKS: dict[str, str] = {
     "IBM": "IBM",
     "JNJ": "Johnson & Johnson",
     "JPM": "JPMorgan Chase",
-    "KMB"
+    "KMB": "Kimberly Clark",
     "KO": "Coca-Cola",
     "LLY": "Eli Lilly",
     "LOW": "Lowe's",
